@@ -64,9 +64,67 @@ def update_ui_language(selected_language, logs, user_input, submit_button_label)
         gr.update(value=translated_submit_button)
     )
 
+html_content = """
+<div style="
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 150px; /* Adjusted height for the logo */
+    width: 400px; /* Adjusted width for better spacing */
+    border-radius: 15px; /* Rounded corners for the logo */
+    font-family: Arial, sans-serif;
+    text-align: center;">
+    <style>
+        @media (prefers-color-scheme: dark) {
+            .logo-container {
+                # background: radial-gradient(circle, #4b79a1, #283e51); /* Subtle gradient for dark mode */
+                color: #f5f5f5; /* Soft white for main text */
+                text-shadow: 0px 0px 5px rgba(255, 255, 255, 0.6), 0px 0px 10px rgba(0, 255, 150, 0.4), 0px 0px 15px rgba(0, 150, 255, 0.3);
+            }
+            .tagline {
+                color: rgba(255, 255, 255, 0.7); /* Subtle white color for tagline */
+            }
+        }
+        @media (prefers-color-scheme: light) {
+            .logo-container {
+                # background: radial-gradient(circle, #e0eafc, #cfdef3); /* Soft blue gradient for light mode */
+                color: #283e51; /* Dark text for better contrast in light mode */
+                text-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2), 0px 0px 10px rgba(0, 255, 150, 0.4), 0px 0px 15px rgba(0, 150, 255, 0.3);
+            }
+            .tagline {
+                color: rgba(40, 62, 81, 0.7); /* Subtle dark color for tagline */
+            }
+        }
+    </style>
+    <div class="logo-container" style="padding: 20px; border-radius: 15px;">
+        <div style="display: flex; justify-content: center; align-items: baseline; gap: 5px; margin-bottom: 10px;">
+            <span style="font-size: 2.5em;">B</span>
+            <span style="font-size: 2.3em;">a</span>
+            <span style="font-size: 2em;">c</span>
+            <span style="font-size: 1.8em;">k</span>
+            <span style="font-size: 1.5em;">O</span>
+            <span style="font-size: 1.8em;">P</span>
+            <span style="font-size: 2em;">S</span>
+            <span style="font-size: 1.8em; color: #00d4ff;">.</span>
+            <span style="font-size: 2.3em;">A</span>
+            <span style="font-size: 2.5em;">I</span>
+        </div>
+        <div class="tagline" style="
+            font-size: 1em;
+            text-align: center;
+            margin-top: 5px;
+            font-style: italic;">
+            effortless backend control powered by AI
+        </div>
+    </div>
+</div>
+"""
+
 # Gradio UI
 with gr.Blocks() as demo:
 
+    backups_ai_title = gr.HTML(html_content)
     supported_languages = get_supported_languages()
     
     gr.Markdown("<br><br>", visible=False)
