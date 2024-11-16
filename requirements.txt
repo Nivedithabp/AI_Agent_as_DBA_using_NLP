@@ -1,0 +1,7 @@
+gradio
+requests
+pymongo
+transformers
+torch
+deep_translator
+langcodes
