@@ -9,6 +9,7 @@ db = client["dba"]
 # Collections
 chat_history_collection = db["chat_history"]
 logs_collection = db["logs"]
+user_table = db["user"]  # Example table for user data
 
 def log_chat(user_message, agent_response):
     """
@@ -19,6 +20,7 @@ def log_chat(user_message, agent_response):
         "agent_response": agent_response,
         "timestamp": datetime.now()
     }
+    print(f"[DEBUG] Logging chat to MongoDB: {entry}")
     chat_history_collection.insert_one(entry)
 
 def retrieve_global_chat_history():
@@ -37,3 +39,28 @@ def log_action(task, status):
         "timestamp": datetime.now()
     }
     logs_collection.insert_one(log_entry)
+
+def perform_mongo_operation(action, key, value=None):
+    """
+    Performs the requested database operation (insert, update, delete) in the MongoDB user table.
+    """
+    if action.lower() == "insert":
+        if user_table.find_one({"key": key}):
+            return f"Key '{key}' already exists in the user table."
+        user_table.insert_one({"key": key, "value": value, "created": datetime.now(), "updated": datetime.now()})
+        return f"Successfully inserted key '{key}' with value '{value}' into the user table."
+
+    elif action.lower() == "update":
+        if not user_table.find_one({"key": key}):
+            return f"Key '{key}' does not exist in the user table."
+        user_table.update_one({"key": key}, {"$set": {"value": value, "updated": datetime.now()}})
+        return f"Successfully updated key '{key}' with value '{value}' in the user table."
+
+    elif action.lower() == "delete":
+        if not user_table.find_one({"key": key}):
+            return f"Key '{key}' does not exist in the user table."
+        user_table.delete_one({"key": key})
+        return f"Successfully deleted key '{key}' from the user table."
+
+    else:
+        return "Unsupported action."
