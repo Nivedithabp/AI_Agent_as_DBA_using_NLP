@@ -1,5 +1,9 @@
 AI Agent for Operating a Backend System Using Natural Language
 
+pip install -r requirment.txt
+python chat_ui.py
+Running on local URL:  http://127.0.0.1:7860
+
 
 Introduction
 This project focuses on developing an AI agent that a user can interact with using natural language
