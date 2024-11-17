@@ -7,7 +7,7 @@ from langcodes import Language
 
 
 # Function to handle chatbot response with slots
-def chatbot_response_with_slots(user_input, chat_history=[], slots={}, selected_language="en"):
+def chatbot_response_with_slots(user_input, chat_history=[], slots={}, selected_language="english"):
     """
     Handles the chatbot response using slots and translates the response
     based on the selected language from the dropdown.
@@ -168,7 +168,7 @@ with gr.Blocks() as demo:
             # Language Dropdown
             language_dropdown = gr.Dropdown(
                 list(supported_languages.keys()),
-                value="en",
+                value="english",
                 label="Language",
                 interactive=True,
             )

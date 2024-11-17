@@ -1,18 +1,25 @@
 from llama_api import process_with_llama, perform_mongo_operation
 from mongo_operations import log_chat, log_action
+import re
 
 def classify_and_respond_with_slots(user_input, slots):
     """
     Classifies user input, fills slots interactively, and performs DB operations when slots are filled.
     Supports "cancel" or "clear" to reset the conversation.
+    Handles multiple commands separated by "and", "\n", or ".".
+    Validates keys using regex.
     """
     print(f"[DEBUG] classify_and_respond_with_slots received input: {user_input}")
     print(f"[DEBUG] Current slots: {slots}")
+
+    # Regex pattern for a valid key
+    valid_key_pattern = r"^[a-zA-Z0-9_]{1,15}$"
 
     # Check for "cancel" or "clear" to reset the conversation
     if user_input.lower() in ["cancel", "clear"]:
         slots.clear()
         return "Operation canceled. Starting a new conversation.", slots
+
     # Check for "help" to provide guidance
     if user_input.lower() == "help":
         help_message = (
@@ -27,7 +34,19 @@ def classify_and_respond_with_slots(user_input, slots):
         )
         slots.clear()
         return help_message, slots
-    
+
+    # Split input by multiple delimiters: "and", "\n", "."
+    commands = re.split(r"\band\b|\n|\.", user_input)
+    commands = [cmd.strip() for cmd in commands if cmd.strip()]  # Remove empty or whitespace-only commands
+
+    if len(commands) > 1:
+        responses = []
+        for command in commands:
+            # Recursively process each command
+            response, slots = classify_and_respond_with_slots(command.strip(), slots)
+            responses.append(response)
+        return "\n".join(responses), slots
+
     # Extract slot data
     action = slots.get("action")
     key = slots.get("key")
@@ -37,16 +56,22 @@ def classify_and_respond_with_slots(user_input, slots):
 
     # If missing slots, use the input to fill them
     if action and key:
+        # Validate key before proceeding
+        if not re.match(valid_key_pattern, key):
+            return (
+                f"Invalid key: '{key}'. Keys must only contain letters, numbers, and underscores "
+                "and be less than 16 characters long.",
+                slots,
+            )
+
         if action.lower() in ["add", "insert"] and not value:
             slots["value"] = user_input
             value = user_input
         elif action.lower() == "update":
             if not from_value and not value:
-                # Update expects either `value` or `from`
                 slots["value"] = user_input
                 value = user_input
             elif from_value and not to_value:
-                # Update expects `to` value after `from`
                 slots["to"] = user_input
                 to_value = user_input
     else:
@@ -65,11 +90,20 @@ def classify_and_respond_with_slots(user_input, slots):
         to_value = extracted_data.get("to")
         slots.update({"action": action, "key": key, "value": value, "from": from_value, "to": to_value})
 
+    # Validate the key
+    if key and not re.match(valid_key_pattern, key):
+        slots.clear()
+        return (
+            f"Invalid key: '{key}'. Keys must only contain letters, numbers, and underscores "
+            "and be less than 16 characters long.",
+            slots,
+        )
+
     # Handle missing slots interactively
     if not action:
         return "What action would you like to perform? (e.g., add, update, delete, get, give)", slots
 
-    if action.lower() in ["get", "give"] and not key:
+    if action.lower() in ["get", "give", "select"] and not key:
         return "Please provide the key to retrieve data.", slots
 
     if action.lower() in ["insert", "add"] and not key:
@@ -95,12 +129,14 @@ def classify_and_respond_with_slots(user_input, slots):
                 response = perform_mongo_operation(action, key, from_value=from_value, to_value=to_value)
             else:
                 response = perform_mongo_operation(action, key, value=value)
-        elif action.lower() in ["get", "give" , "select"]:
+        elif action.lower() in ["get", "give", "select"]:
             response = perform_mongo_operation(action, key)
         else:
             response = f"Unsupported action: {action}"
+
         # Log the action after database operation
         log_action(user_input, "Success" if "Successfully" in response else "Failed")
+
         # Clear slots after successful operation
         slots.clear()
         return response, slots
@@ -109,109 +145,3 @@ def classify_and_respond_with_slots(user_input, slots):
         print(f"[ERROR] Exception in classify_and_respond_with_slots: {e}")
         return f"An error occurred: {str(e)}", slots
 
-
-# def classify_and_respond_with_slots(user_input, slots):
-#     """
-#     Classifies user input, fills slots interactively, and performs DB operations when slots are filled.
-#     """
-#     print(f"[DEBUG] classify_and_respond_with_slots received input: {user_input}")
-#     print(slots)
-#     # Extract slot data
-#     action = slots.get("action")
-#     key = slots.get("key")
-#     value = slots.get("value")
-#     update_from = slots.get("from")
-#     update_to = slots.get("to")
-
-#     # If value is pending and no new action is detected, treat input as the missing slot
-#     if action and key and not value:
-#         print(f"[DEBUG] Filling missing 'value' slot with user input: {user_input}")
-#         slots["value"] = user_input
-#         value = user_input
-
-#     elif action == "update" and key and not update_from:
-#         print(f"[DEBUG] Filling missing 'from' slot with user input: {user_input}")
-#         slots["from"] = user_input
-#         update_from = user_input
-
-#     elif action == "update" and key and update_from and not update_to:
-#         print(f"[DEBUG] Filling missing 'to' slot with user input: {user_input}")
-#         slots["to"] = user_input
-#         update_to = user_input
-
-#     else:
-#         # If no ongoing slot filling, classify the input to determine action
-#         extracted_data = process_with_llama(user_input)
-#         print(f"[DEBUG] Data extracted by LLaMA API: {extracted_data}")
-
-#         if "error" in extracted_data:
-#             return f"Could not process your input. Error: {extracted_data['error']}", slots
-
-#         # Update slots with extracted data
-#         action = extracted_data.get("action")
-#         key = extracted_data.get("key")
-#         value = extracted_data.get("value")
-#         update_from = extracted_data.get("from")
-#         update_to = extracted_data.get("to")
-#         slots.update({"action": action, "key": key, "value": value, "from": update_from, "to": update_to})
-
-#     # Handle missing slots interactively
-#     if not action:
-#         return "What action would you like to perform? (e.g., add, update, delete, get)", slots
-
-#     if not key:
-#         return "Kindly provide the key to proceed.", slots
-
-#     if action.lower() in ["insert", "add"] and not value:
-#         return "Kindly provide the value to be inserted.", slots
-
-#     if action.lower() == "update":
-#         if not update_from:
-#             return "Please provide the current value (from) to update.", slots
-#         if not update_to:
-#             return "Please provide the new value (to) for the update.", slots
-
-#     # Perform database operation when all slots are filled
-#     try:
-#         if action.lower() == "delete":
-#             response = perform_mongo_operation(action, key)
-#         elif action.lower() in ["insert", "add"]:
-#             response = perform_mongo_operation(action, key, value=value)
-#         elif action.lower() == "update":
-#             response = perform_mongo_operation(action, key, update_from=update_from, update_to=update_to)
-#         elif action.lower() == "get":
-#             response = perform_mongo_operation(action, key)
-#         elif action.lower() in ["give", "select"]:
-#             response = perform_mongo_operation(action)
-#         else:
-#             response = f"Unsupported action: {action}"
-
-#         # Clear slots after the operation
-#         slots.clear()
-#         return response, slots
-
-#     except Exception as e:
-#         print(f"[ERROR] Exception in classify_and_respond_with_slots: {e}")
-#         return f"An error occurred: {str(e)}", slots
-
-
-def classify_and_respond(user_input):
-    print(f"[DEBUG] classify_and_respond received input: {user_input}")
-
-    extracted_data = process_with_llama(user_input)
-    print(f"[DEBUG] Data extracted by LLaMA API: {extracted_data}")
-
-    if "error" in extracted_data:
-        return f"Error: {extracted_data['error']}"
-
-    action = extracted_data.get("action")
-    key = extracted_data.get("key")
-    value = extracted_data.get("value")
-
-    if not action or not key:
-        return "[ERROR] Missing action or key in extracted data."
-
-    db_result = perform_mongo_operation(action, key, value)
-    log_chat(user_input, db_result)
-    log_action(user_input, "Success" if "Successfully" in db_result else "Failed")
-    return db_result
