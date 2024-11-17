@@ -81,7 +81,7 @@ This project creates an AI agent that interacts with users through natural langu
 ## Testing
 1. **Run Tests**:
    ```bash
-   pytest tests/
+   python tests/test.py
    ```
 2. **Scenarios Covered**:
    - Valid requests for insert, update, and delete operations.
