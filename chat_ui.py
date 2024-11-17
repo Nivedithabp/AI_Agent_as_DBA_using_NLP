@@ -4,6 +4,69 @@ from main import classify_and_respond_with_slots
 from mongo_operations import retrieve_global_chat_history
 from deep_translator import GoogleTranslator
 from langcodes import Language
+import matplotlib
+matplotlib.use('Agg') 
+import matplotlib.pyplot as plt
+import json
+from faq import get_faq_content
+from mongo_operations import retrieve_success_logs, retrieve_failed_logs, retrieve_all_logs, count_user_records, count_success_logs, count_failed_logs
+import pandas as pd
+import os
+
+
+# Function to generate the stats graph and scoreboard
+def generate_stats_graph():
+    # Generate the data
+    categories = ['Success', 'Failed', 'Total Records']
+    values = [count_success_logs(), count_failed_logs(), count_user_records()]
+    colors = ['#1E90FF', '#4682B4', '#5F9EA0']
+
+    data = {"Category": categories, "Value": values}
+    graph_path = create_bar_graph(data, "Category", "Value", colors)
+
+    # Generate scoreboard HTML
+    scoreboard_html = f"""
+    <div style="color: #FFD700; font-size: 24px; background: #1E1E1E; padding: 20px; border-radius: 10px;">
+        <h2 style="margin: 0;">Database Record Stats</h2>
+        <p>✅ Success: <strong>{values[0]}</strong></p>
+        <p>❌ Failed: <strong>{values[1]}</strong></p>
+        <p>📋 Total Records: <strong>{values[2]}</strong></p>
+    </div>
+    """
+    
+    # Return the updated graph path and scoreboard HTML
+    return graph_path, scoreboard_html
+
+
+# Function to create and save the bar graph with specific colors for categories
+def create_bar_graph(data, x_col, y_col, colors):
+    df = pd.DataFrame(data)
+    
+    # Create the plot with a gaming theme
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.bar(df[x_col], df[y_col], color=colors, edgecolor="black")
+    
+    # Set titles and labels with a gaming font
+    ax.set_title("Operations and Records Count", fontsize=18, color="#FFD700", weight="bold")
+    ax.set_xlabel(x_col, fontsize=14, color="#00FFFF")
+    ax.set_ylabel(y_col, fontsize=14, color="#00FFFF")
+    ax.tick_params(axis='x', colors="#FF69B4")
+    ax.tick_params(axis='y', colors="#FF69B4")
+    ax.set_facecolor("#1E1E1E")  # Dark background for gaming theme
+    fig.patch.set_facecolor("#2B2B2B")  # Outer background for the figure
+
+    # Save the figure
+    image_path = "gaming_bar_graph.png"
+    fig.savefig(image_path, dpi=150)
+    plt.close(fig)
+    return image_path
+
+# Function to handle the visibility toggling for FAQ and Stats
+def toggle_visibility(show_faq, show_stats, section):
+    if section == "faq":
+        return gr.update(visible=True), gr.update(visible=False), False, True
+    elif section == "stats":
+        return gr.update(visible=False), gr.update(visible=True), True, False
 
 
 # Function to handle chatbot response with slots
@@ -60,22 +123,44 @@ def translate_content(content, language):
     except Exception as e:
         return content  # Fallback to original content in case of error
     
-# Function to filter logs based on log level and update language
-def filter_and_translate_logs(selected_level, selected_language, all_logs):
-    # Simulated log messages for each level
-    log_levels = {
-        "Info": "Info: This is an informational log.",
-        "Debug": "Debug: This is a debug log.",
-        "Error": "Error: This is an error log.",
-    }
-    
-    # Filter logs based on the selected level
-    filtered_logs = [log for log in all_logs if selected_level in log]
-    
-    # Translate the logs to the selected language
-    translated_logs = translate_content(filtered_logs, selected_language)
-    
-    return "\n".join(translated_logs)
+def get_and_filter_logs(selected_level, logs_state, selected_language):
+    if selected_level == "success":
+        raw_logs = retrieve_success_logs()
+    elif selected_level == "failed":
+        raw_logs = retrieve_failed_logs()
+    else:
+        raw_logs = retrieve_all_logs()
+
+    processed_logs = []
+    for log in raw_logs:
+        task = log['task']
+        status = log['status']
+        timestamp = log['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
+
+        processed_log = {
+            'status': status,
+            'task': task,
+            'timestamp': timestamp
+        }
+
+        processed_logs.append(processed_log)
+
+    translated_logs = translate_logs(processed_logs, selected_language)
+    logs_state = translated_logs
+    logs_display = "\n".join([f"{log['timestamp']} : {log['task']}" for log in translated_logs])
+
+    return logs_display, logs_state
+
+def translate_logs(logs, language):
+    try:
+        translator = GoogleTranslator(source='auto', target=language)
+        for log in logs:
+            log['task'] = translator.translate(log['task'])
+            log['status'] = translator.translate(log['status'])
+        return logs
+    except Exception as e:
+        print(f"Error translating logs: {e}")
+        return logs
 
 # Dynamically translate the entire UI based on the selected language
 def update_ui_language(selected_language, logs, user_input, submit_button_label):
@@ -148,11 +233,11 @@ html_content = """
 
 # Gradio UI
 with gr.Blocks() as demo:
-
     backups_ai_title = gr.HTML(html_content)
     supported_languages = get_supported_languages()
     
     gr.Markdown("<br><br>", visible=False)
+    
     # Create layout with 3/4 for chatbot and 1/4 for operations
     with gr.Row():
         # Chatbot on the left side (3/4 width)
@@ -165,73 +250,73 @@ with gr.Blocks() as demo:
 
         # Operations (input, button, and language dropdown) on the right side (1/4 width)
         with gr.Column(scale=1):
-            # Language Dropdown
+            # FAQ and Stats buttons in a row
+            with gr.Row(): 
+                faq_button = gr.Button("FAQ")
+                stats_button = gr.Button("Stats")
+
             language_dropdown = gr.Dropdown(
                 list(supported_languages.keys()),
                 value="english",
                 label="Language",
                 interactive=True,
             )
-            gr.Markdown("<br><br>", visible=False)
-            gr.Markdown("<br><br>", visible=False)
-            # Log Level Dropdown for filtering logs
             log_dropdown = gr.Dropdown(
-                ["Info", "Debug", "Error"], 
-                value="Info", 
+                ["Success", "Failed", "All"],  
                 label="Filter Logs"
             )
-            gr.Markdown("<br><br>", visible=False)
-            gr.Markdown("<br><br>", visible=False)
-            # Placeholder for logs display
             logs = gr.Textbox(
+                label="Logs",
                 placeholder="Filtered logs will appear here...",
                 value="Welcome to the log viewer. Here are your logs.",
                 lines=5,
             )
-
-    # Sample logs to filter
-    all_logs = [
-        "Info: This is an informational log.",
-        "Debug: This is a debug log.",
-        "Error: This is an error log.",
-        "Info: Another informational log.",
-        "Debug: Another debug log.",
-        "Error: Another error log."
-    ]
     
-    # Wrap all logs in gr.State to pass it as input to the filter_logs function
-    logs_state = gr.State(all_logs)
+    logs_state = gr.State([])
 
-    # state = gr.State([])
+    # Add Stats and FAQ section dynamically
+    with gr.Row():
+        with gr.Column(scale=1):
+            stats_image = gr.Image(label="Stats Graph", elem_id="stats-graph", height=400, visible=True)
+        with gr.Column(scale=1):
+            content_display = gr.HTML(label="Scoreboard", visible=True)  # To show FAQ or scoreboard
 
-    # # Interactivity for the chatbot
-    # submit_button.click(
-    #     chatbot_response,
-    #     inputs=[user_input, state],
-    #     outputs=[chatbot, state]
-    # )
+    # Stats Button to generate and update graph/scoreboard
+    stats_button.click(
+        generate_stats_graph,
+        inputs=[],
+        outputs=[stats_image, content_display],  # Updates both graph and scoreboard
+    )
+
+    # FAQ Button to replace the stats graph with FAQ content
+    faq_button.click(
+        lambda: (gr.update(visible=False), gr.update(value=get_faq_content(), visible=True)),
+        inputs=[],
+        outputs=[stats_image, content_display]  # Replaces graph with FAQ content
+    )
     
+    # Chatbot functionality
     chat_history_state = gr.State([])
     slot_state = gr.State({"action": None, "key": None, "value": None, "from": None, "to": None})
 
     submit_button.click(
-    chatbot_response_with_slots,
-    inputs=[user_input, chat_history_state, slot_state, language_dropdown],
-    outputs=[chatbot, slot_state]  # Updates the chatbot with the translated chat history
+        chatbot_response_with_slots,
+        inputs=[user_input, chat_history_state, slot_state, language_dropdown],
+        outputs=[chatbot, slot_state]
     )
 
-    # Interactivity for the log level dropdown to filter logs and update language
-    log_dropdown.change(
-        filter_and_translate_logs,
-        inputs=[log_dropdown, language_dropdown, logs_state],
-        outputs=[logs]
-    )
+    user_input.submit(lambda: "", inputs=[], outputs=[user_input])
 
-    # Update UI language dynamically
     language_dropdown.change(
         update_ui_language,
         inputs=[language_dropdown, logs, user_input, submit_button],
-        outputs=[user_input, logs, submit_button]
+        outputs=[user_input, logs, submit_button],
+    )
+
+    log_dropdown.change(
+        get_and_filter_logs,
+        inputs=[log_dropdown, logs_state, language_dropdown],
+        outputs=[logs, logs_state],
     )
 
 # Launch the demo
