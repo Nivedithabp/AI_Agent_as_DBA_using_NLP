@@ -1,6 +1,6 @@
 from llama_api import process_with_llama
 import gradio as gr
-from main import classify_and_respond , classify_and_respond_with_slots
+from main import classify_and_respond_with_slots
 from mongo_operations import retrieve_global_chat_history
 from deep_translator import GoogleTranslator
 from langcodes import Language
@@ -14,13 +14,13 @@ def chatbot_response_with_slots(user_input, chat_history=[], slots={}, selected_
     """
     try:
         print(f"[DEBUG] User input: {user_input}")
-        response, updated_slots = classify_and_respond_with_slots(user_input, slots)
+        response, updated_slots = classify_and_respond_with_slots(user_input, slots ,selected_language )
         
         # Translate the response to the selected language
-        translated_response = translate_content(response, selected_language)
+        #translated_response = translate_content(response, selected_language)
         
         # Append both the input and translated response to chat history
-        chat_history.append((user_input, translated_response))
+        chat_history.append((user_input, response))
         return chat_history, updated_slots
     except Exception as e:
         response = f"Error processing request: {str(e)}"
@@ -30,14 +30,14 @@ def chatbot_response_with_slots(user_input, chat_history=[], slots={}, selected_
         return chat_history, slots
 
 
-def chatbot_response(user_input, chat_history=[]):
-    try:
-        print(f"[DEBUG] User input: {user_input}")
-        response = classify_and_respond(user_input)
-    except Exception as e:
-        response = f"Error processing request: {str(e)}"
-    chat_history.append((user_input, response))
-    return chat_history, chat_history
+# def chatbot_response(user_input, chat_history=[]):
+#     try:
+#         print(f"[DEBUG] User input: {user_input}")
+#         response = classify_and_respond(user_input)
+#     except Exception as e:
+#         response = f"Error processing request: {str(e)}"
+#     chat_history.append((user_input, response))
+#     return chat_history, chat_history
 
 def load_chat_history():
     history = retrieve_global_chat_history()
