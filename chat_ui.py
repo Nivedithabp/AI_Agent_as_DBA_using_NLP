@@ -1,18 +1,43 @@
 from llama_api import process_with_llama
 import gradio as gr
-from main import classify_and_respond
+from main import classify_and_respond_with_slots
 from mongo_operations import retrieve_global_chat_history
 from deep_translator import GoogleTranslator
 from langcodes import Language
 
-def chatbot_response(user_input, chat_history=[]):
+
+# Function to handle chatbot response with slots
+def chatbot_response_with_slots(user_input, chat_history=[], slots={}, selected_language="english"):
+    """
+    Handles the chatbot response using slots and translates the response
+    based on the selected language from the dropdown.
+    """
     try:
         print(f"[DEBUG] User input: {user_input}")
-        response = classify_and_respond(user_input)
+        response, updated_slots = classify_and_respond_with_slots(user_input, slots ,selected_language )
+        
+        # Translate the response to the selected language
+        #translated_response = translate_content(response, selected_language)
+        
+        # Append both the input and translated response to chat history
+        chat_history.append((user_input, response))
+        return chat_history, updated_slots
     except Exception as e:
         response = f"Error processing request: {str(e)}"
-    chat_history.append((user_input, response))
-    return chat_history, chat_history
+        # Translate the error message to the selected language
+        translated_response = translate_content(response, selected_language)
+        chat_history.append((user_input, translated_response))
+        return chat_history, slots
+
+
+# def chatbot_response(user_input, chat_history=[]):
+#     try:
+#         print(f"[DEBUG] User input: {user_input}")
+#         response = classify_and_respond(user_input)
+#     except Exception as e:
+#         response = f"Error processing request: {str(e)}"
+#     chat_history.append((user_input, response))
+#     return chat_history, chat_history
 
 def load_chat_history():
     history = retrieve_global_chat_history()
@@ -143,7 +168,7 @@ with gr.Blocks() as demo:
             # Language Dropdown
             language_dropdown = gr.Dropdown(
                 list(supported_languages.keys()),
-                value="en",
+                value="english",
                 label="Language",
                 interactive=True,
             )
@@ -177,15 +202,24 @@ with gr.Blocks() as demo:
     # Wrap all logs in gr.State to pass it as input to the filter_logs function
     logs_state = gr.State(all_logs)
 
-    state = gr.State([])
+    # state = gr.State([])
 
-    # Interactivity for the chatbot
-    submit_button.click(
-        chatbot_response,
-        inputs=[user_input, state],
-        outputs=[chatbot, state]
-    )
+    # # Interactivity for the chatbot
+    # submit_button.click(
+    #     chatbot_response,
+    #     inputs=[user_input, state],
+    #     outputs=[chatbot, state]
+    # )
     
+    chat_history_state = gr.State([])
+    slot_state = gr.State({"action": None, "key": None, "value": None, "from": None, "to": None})
+
+    submit_button.click(
+    chatbot_response_with_slots,
+    inputs=[user_input, chat_history_state, slot_state, language_dropdown],
+    outputs=[chatbot, slot_state]  # Updates the chatbot with the translated chat history
+    )
+
     # Interactivity for the log level dropdown to filter logs and update language
     log_dropdown.change(
         filter_and_translate_logs,
@@ -202,8 +236,3 @@ with gr.Blocks() as demo:
 
 # Launch the demo
 demo.launch()
-
-
-
-
-
