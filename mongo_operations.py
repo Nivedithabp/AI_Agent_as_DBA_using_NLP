@@ -40,27 +40,49 @@ def log_action(task, status):
     }
     logs_collection.insert_one(log_entry)
 
-def perform_mongo_operation(action, key, value=None):
+def perform_mongo_operation(action, key=None, value=None):
     """
-    Performs the requested database operation (insert, update, delete) in the MongoDB user table.
+    Performs the requested database operation (insert, update, delete, get, give/select) in the MongoDB user table.
     """
-    if action.lower() == "insert":
-        if user_table.find_one({"key": key}):
-            return f"Key '{key}' already exists in the user table."
-        user_table.insert_one({"key": key, "value": value, "created": datetime.now(), "updated": datetime.now()})
-        return f"Successfully inserted key '{key}' with value '{value}' into the user table."
+    try:
+        # Handle 'insert' operation
+        if action.lower() in ["insert", "add", "append", "include", "place"]:
+            if user_table.find_one({"key": key}):
+                return f"Key '{key}' already exists in the user table."
+            user_table.insert_one({"key": key, "value": value, "created": datetime.now(), "updated": datetime.now()})
+            return f"Successfully inserted key '{key}' with value '{value}' into the user table."
 
-    elif action.lower() == "update":
-        if not user_table.find_one({"key": key}):
-            return f"Key '{key}' does not exist in the user table."
-        user_table.update_one({"key": key}, {"$set": {"value": value, "updated": datetime.now()}})
-        return f"Successfully updated key '{key}' with value '{value}' in the user table."
+        # Handle 'update' operation
+        elif action.lower() in ["update", "change", "modify", "edit"]:
+            if not user_table.find_one({"key": key}):
+                return f"Key '{key}' does not exist in the user table."
+            user_table.update_one({"key": key}, {"$set": {"value": value, "updated": datetime.now()}})
+            return f"Successfully updated key '{key}' with value '{value}' in the user table."
 
-    elif action.lower() == "delete":
-        if not user_table.find_one({"key": key}):
-            return f"Key '{key}' does not exist in the user table."
-        user_table.delete_one({"key": key})
-        return f"Successfully deleted key '{key}' from the user table."
+        # Handle 'delete' operation
+        elif action.lower() in ["delete", "remove", "cancel", "cut", "erase"]:
+            if not user_table.find_one({"key": key}):
+                return f"Key '{key}' does not exist in the user table."
+            user_table.delete_one({"key": key})
+            return f"Successfully deleted key '{key}' from the user table."
 
-    else:
-        return "Unsupported action."
+        # Handle 'get' operation
+        elif action.lower() in ["get", "find", "fetch"]:
+            document = user_table.find_one({"key": key}, {"_id": 0})  # Exclude the MongoDB-generated _id
+            if not document:
+                return f"Key '{key}' does not exist in the user table."
+            return f"Retrieved value for key '{key}': {document.get('value', 'No value found')}."
+
+        # Handle 'give' or 'select' operation (fetch multiple records or a range)
+        elif action.lower() in ["give", "select"]:
+            documents = list(user_table.find({}, {"_id": 0}))  # Fetch all records, exclude the MongoDB-generated _id
+            if not documents:
+                return "No records found in the user table."
+            return f"Retrieved records: {documents}"
+
+        # Handle unsupported actions
+        else:
+            return f"Unsupported action: {action}"
+
+    except Exception as e:
+        return f"[ERROR] An error occurred while performing the {action} operation: {str(e)}"
