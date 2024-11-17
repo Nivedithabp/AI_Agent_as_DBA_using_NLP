@@ -40,6 +40,47 @@ def log_action(task, status):
     }
     logs_collection.insert_one(log_entry)
 
+
+def count_user_records():
+    """
+    Returns the number of records present in the user table.
+    """
+    count = user_table.count_documents({})
+    return count
+
+
+def retrieve_success_logs():
+    """
+    Retrieves logs with 'success' status from MongoDB.
+    """
+    return list(logs_collection.find({"status": "Success"}, {"_id": 0}).sort("timestamp", -1).limit(10))
+
+def retrieve_failed_logs():
+    """
+    Retrieves logs with 'failed' status from MongoDB.
+    """
+    return list(logs_collection.find({"status": "Failed"}, {"_id": 0}).sort("timestamp", -1).limit(10))
+
+def retrieve_all_logs():
+    """
+    Retrieves all logs from MongoDB.
+    """
+    return list(logs_collection.find({}, {"_id": 0}).sort("timestamp", -1).limit(10))
+
+def count_success_logs():
+    """
+    Returns the count of logs with 'Success' status.
+    """
+    success_count = logs_collection.count_documents({"status": "Success"})
+    return success_count
+
+def count_failed_logs():
+    """
+    Returns the count of logs with 'Failed' status.
+    """
+    failed_count = logs_collection.count_documents({"status": "Failed"})
+    return failed_count    
+
 def perform_mongo_operation(action, key=None, value=None):
     """
     Performs the requested database operation (insert, update, delete, get, give/select) in the MongoDB user table.
