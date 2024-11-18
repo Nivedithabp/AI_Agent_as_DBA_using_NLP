@@ -2,7 +2,7 @@ import pymongo
 from datetime import datetime
 
 # MongoDB connection
-MONGO_URI = "mongodb+srv://test:test123456@dba.pqohx.mongodb.net/?retryWrites=true&w=majority&appName=dba"
+MONGO_URI = "url"
 client = pymongo.MongoClient(MONGO_URI)
 db = client["dba"]
 
