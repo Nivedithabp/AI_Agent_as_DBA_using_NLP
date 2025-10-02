@@ -10,7 +10,7 @@ https://youtu.be/P32ASsNMB4k?si=aNvr8jFBWz38N-ox
 ![image](https://github.com/user-attachments/assets/21a0d14f-cca0-448d-b5eb-23cfcbbc4aec)
 
 ## Prerequisites
-1. **Python 3.8+**
+1. **Python 3.8+** and latest version
 2. **Required Libraries**: Install dependencies using the provided requirements file:
    ```bash
    pip install -r requirements.txt
